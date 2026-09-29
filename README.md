@@ -41,6 +41,7 @@ The `sequence` command creates a trade, retrieves it, and deletes it. Individual
 python -m main.main --email user@example.com create --source USD --destination BTC --quantity 1 --side sell --price 50000
 python -m main.main --email user@example.com get 1
 python -m main.main --email user@example.com delete 1
+python -m main.main --email user@example.com balance USD
 ```
 
 Use `--target host:port` to connect to a server other than `127.0.0.1:8080`.

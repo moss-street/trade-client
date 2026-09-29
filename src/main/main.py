@@ -28,6 +28,9 @@ def parse_args():
     delete = commands.add_parser("delete")
     delete.add_argument("trade_id", type=int)
 
+    balance = commands.add_parser("balance")
+    balance.add_argument("symbol")
+
     sequence = commands.add_parser("sequence")
     sequence.add_argument("--source", required=True)
     sequence.add_argument("--destination", required=True)
@@ -125,6 +128,17 @@ def main():
                         != trading_pb2.DeleteTradeResponse.DELETE_TRADE_STATUS_OK
                     ):
                         raise RuntimeError("Trade deletion failed")
+            elif args.command == "balance":
+                response = trade_stub.GetWalletBalance(
+                    trading_pb2.GetWalletBalanceRequest(symbol=args.symbol),
+                    metadata=metadata,
+                )
+                print(response)
+                if response.status not in (
+                    trading_pb2.GetWalletBalanceResponse.GET_WALLET_BALANCE_STATUS_OK,
+                    trading_pb2.GetWalletBalanceResponse.GET_WALLET_BALANCE_STATUS_NOT_FOUND,
+                ):
+                    raise RuntimeError("Wallet balance lookup failed")
             elif args.command == "get":
                 response = trade_stub.GetTrade(
                     trading_pb2.GetTradeRequest(
