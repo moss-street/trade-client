@@ -45,3 +45,21 @@ python -m main.main --email user@example.com balance USD
 ```
 
 Use `--target host:port` to connect to a server other than `127.0.0.1:8080`.
+
+## Live trading simulation
+
+The `simulate` command creates isolated users and verifies real settlement
+outcomes against a running server. Each round covers:
+
+* limit-order best-price selection and a partial fill;
+* cancellation of the remaining limit reservation;
+* a partially filled market order and refund of its unfilled amount; and
+* an unfilled market order that must not leave funds reserved.
+
+```bash
+MARKET_SIM_PASSWORD='simulation-password' \
+python -m main.main --email unused@example.com simulate --rounds 10
+```
+
+`--email` remains required by the command-line parser but is not used by
+`simulate`. Use `--email-prefix` to distinguish generated simulation accounts.
