@@ -38,6 +38,10 @@ def parse_args():
     balance = commands.add_parser("balance")
     balance.add_argument("symbol")
 
+    add_funds = commands.add_parser("add-funds")
+    add_funds.add_argument("symbol")
+    add_funds.add_argument("amount", type=float)
+
     sequence = commands.add_parser("sequence")
     sequence.add_argument("--source", required=True)
     sequence.add_argument("--destination", required=True)
@@ -158,6 +162,21 @@ def balance(stub, metadata, symbol):
     return response.balance
 
 
+def add_funds(stub, metadata, symbol, amount):
+    if not symbol.strip():
+        raise ValueError("symbol is required")
+    if not math.isfinite(amount) or amount <= 0:
+        raise ValueError("amount must be a positive finite number")
+
+    response = stub.AddFunds(
+        trading_pb2.AddFundsRequest(symbol=symbol, amount=amount),
+        metadata=metadata,
+    )
+    if response.status != trading_pb2.AddFundsResponse.ADD_FUNDS_STATUS_OK:
+        raise RuntimeError("Funding request failed")
+    return response.balance
+
+
 def assert_balance(stub, metadata, symbol, expected):
     actual = balance(stub, metadata, symbol)
     if not math.isclose(actual, expected, rel_tol=0, abs_tol=1e-9):
@@ -206,6 +225,9 @@ def run_limit_order_scenario(
     buyer = simulation_session(
         auth_stub, password, email_prefix, run_id, round_number, "limit-buyer"
     )
+    add_funds(trade_stub, cheap_seller, "USD", 50.0)
+    add_funds(trade_stub, expensive_seller, "USD", 50.0)
+    add_funds(trade_stub, buyer, "BTC", 50.0)
 
     cheap = submit_trade(
         trade_stub, cheap_seller, "USD", "BTC", 1.0, "sell", "limit", 2.0
@@ -218,15 +240,16 @@ def run_limit_order_scenario(
     )
 
     assert_balance(trade_stub, cheap_seller, "USD", 49.0)
-    assert_balance(trade_stub, cheap_seller, "BTC", 52.0)
+    assert_balance(trade_stub, cheap_seller, "BTC", 2.0)
     assert_balance(trade_stub, expensive_seller, "USD", 49.0)
-    assert_balance(trade_stub, expensive_seller, "BTC", 51.0)
+    assert_balance(trade_stub, expensive_seller, "BTC", 1.0)
     assert_balance(trade_stub, buyer, "BTC", 47.0)
-    assert_balance(trade_stub, buyer, "USD", 51.25)
+    assert_balance(trade_stub, buyer, "USD", 1.25)
     assert_trade_found(trade_stub, buyer, buyer_trade.trade_id)
 
     cancel_trade(trade_stub, expensive_seller, expensive.trade_id)
     assert_balance(trade_stub, expensive_seller, "USD", 49.75)
+    assert_balance(trade_stub, expensive_seller, "BTC", 1.0)
     assert_trade_found(trade_stub, cheap_seller, cheap.trade_id)
 
 
@@ -247,21 +270,24 @@ def run_market_order_scenario(
         round_number,
         "unmatched-market-buyer",
     )
+    add_funds(trade_stub, seller, "USD", 50.0)
+    add_funds(trade_stub, buyer, "BTC", 50.0)
+    add_funds(trade_stub, unmatched_buyer, "BTC", 50.0)
 
     submit_trade(trade_stub, seller, "USD", "BTC", 1.0, "sell", "limit", 2.0)
     market = submit_trade(trade_stub, buyer, "BTC", "USD", 4.0, "buy", "market", None)
 
     assert_balance(trade_stub, seller, "USD", 49.0)
-    assert_balance(trade_stub, seller, "BTC", 52.0)
+    assert_balance(trade_stub, seller, "BTC", 2.0)
     assert_balance(trade_stub, buyer, "BTC", 48.0)
-    assert_balance(trade_stub, buyer, "USD", 51.0)
+    assert_balance(trade_stub, buyer, "USD", 1.0)
     assert_trade_found(trade_stub, buyer, market.trade_id)
 
     unmatched = submit_trade(
         trade_stub, unmatched_buyer, "BTC", "USD", 5.0, "buy", "market", None
     )
     assert_balance(trade_stub, unmatched_buyer, "BTC", 50.0)
-    assert_balance(trade_stub, unmatched_buyer, "USD", 50.0)
+    assert_balance(trade_stub, unmatched_buyer, "USD", 0.0)
     assert_trade_found(trade_stub, unmatched_buyer, unmatched.trade_id)
 
 
@@ -348,6 +374,9 @@ def main():
                     trading_pb2.GetWalletBalanceResponse.GET_WALLET_BALANCE_STATUS_NOT_FOUND,
                 ):
                     raise RuntimeError("Wallet balance lookup failed")
+            elif args.command == "add-funds":
+                new_balance = add_funds(trade_stub, metadata, args.symbol, args.amount)
+                print(f"{args.symbol} balance: {new_balance}")
             elif args.command == "get":
                 response = trade_stub.GetTrade(
                     trading_pb2.GetTradeRequest(

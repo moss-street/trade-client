@@ -42,9 +42,13 @@ python -m main.main --email user@example.com create --source USD --destination B
 python -m main.main --email user@example.com get 1
 python -m main.main --email user@example.com delete 1
 python -m main.main --email user@example.com balance USD
+python -m main.main --email user@example.com add-funds USD 100
 ```
 
 Use `--target host:port` to connect to a server other than `127.0.0.1:8080`.
+
+New accounts start with no funds. Use `add-funds` to credit the source asset
+before creating a trade.
 
 ## Live trading simulation
 
